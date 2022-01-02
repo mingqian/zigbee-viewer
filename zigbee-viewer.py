@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
+import scapy
 from scapy.all import rdpcap
 from scapy.layers.zigbee import ZigbeeNWK, ZigbeeSecurityHeader
 from Cryptodome.Cipher import AES
@@ -109,6 +110,7 @@ def usage(cmd):
 
 
 def main(argv):
+    scapy.config.Conf.dot15d4_protocol = "zigbee"
     try:
         pkts = rdpcap(argv[1])
     except IOError:
