@@ -125,19 +125,27 @@ def main(argv):
         usage(argv[0])
         exit()
 
+    packageIndex = -1
     for p in pkts:
-        addr = p[ZigbeeNWK].source
-        ext_src = p[ZigbeeSecurityHeader].source
-        sec_frm_cnt = p[ZigbeeSecurityHeader].fc
-        sec_cntl = 0x2d
-        nonce = pack('<QIB', ext_src, sec_frm_cnt, sec_cntl)
-        key = unhexlify(nwkkey[:-1])  # ignore last LF
-        cipher = AES.new(key, AES.MODE_CCM, nonce)
-        decrypted_data = cipher.decrypt(p.data)
-        info = unpack('BB', decrypted_data[:2])
-        if info[0] == 5 and info[1] > 0:  # route record && relay count > 0
-            update_from_route_record(addr, info[1], decrypted_data[2:])
-
+        try:
+            packageIndex += 1
+            if ZigbeeNWK in p:
+                addr = p[ZigbeeNWK].source
+                ext_src = p[ZigbeeSecurityHeader].source
+                sec_frm_cnt = p[ZigbeeSecurityHeader].fc
+                sec_cntl = 0x2d
+                nonce = pack('<QIB', ext_src, sec_frm_cnt, sec_cntl)
+                key = unhexlify(nwkkey[:-1])  # ignore last LF
+                cipher = AES.new(key, AES.MODE_CCM, nonce)
+                decrypted_data = cipher.decrypt(p.data)
+                info = unpack('BB', decrypted_data[:2])
+                if info[0] == 5 and info[1] > 0:  # route record && relay count > 0
+                    update_from_route_record(addr, info[1], decrypted_data[2:])
+        except Exception as e:
+            print("Exception: "+str(e))
+            print()
+            print("Package (index in file={:d}) causing the issue:".format(packageIndex))
+            print(p.show())
     # show_network()
     update_netjson()
 
