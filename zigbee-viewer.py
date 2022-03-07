@@ -17,7 +17,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
-from scapy.all import rdpcap, ZigbeeNWK, ZigbeeSecurityHeader
+from scapy.all import rdpcap
+from scapy.layers.zigbee import ZigbeeNWK, ZigbeeSecurityHeader
 from Cryptodome.Cipher import AES
 from binascii import unhexlify
 from struct import pack, unpack
