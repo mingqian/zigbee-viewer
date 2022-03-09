@@ -114,7 +114,8 @@ def main(argv):
                                      packet[ZigbeeNWK].destination)
         except IndexError as error:
             logging.debug(
-                "Could not parse Zigbee frame %s\n\tFollowing error wa raised %s" % (
+                """Could not parse Zigbee frame %s
+                \tFollowing error wa raised %s""" % (
                     packet, error
                 )
             )
