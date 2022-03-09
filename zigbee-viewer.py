@@ -33,21 +33,6 @@ nodes = []
 links = []
 
 
-def show_nodes():
-    for n in nodes:
-        logging.info('node: %#x') % n
-
-
-def show_links():
-    for link in links:
-        logging.info('link: %#x <-> %#x') % (link[0], link[1])
-
-
-def show_network():
-    show_nodes()
-    show_links()
-
-
 def update_from_route_record(source, destination):
     """
     Source and destination are nodes. Links are a tuple made of those two.
@@ -70,12 +55,15 @@ def update_from_route_record(source, destination):
     """
     if source not in nodes and source < 0xfff8:
         nodes.append(source)
+        logging.debug('node: %#x') % source
     if destination not in nodes and destination < 0xfff8:
         nodes.append(destination)
+        logging.debug('node: %#x') % destination
     if source < 0xfff8 and destination < 0xfff8:
         link = (source, destination)
         if link not in links:
             links.append(link)
+            logging.info('link: %#x <-> %#x') % (source, destination)
 
 
 def update_netjson():
@@ -130,7 +118,6 @@ def main(argv):
                     packet, error
                 )
             )
-    # show_network()
     update_netjson()
 
 
