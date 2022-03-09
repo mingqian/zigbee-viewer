@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import argparse
 import json
 import logging
 import sys
@@ -55,18 +56,18 @@ def update_from_route_record(source, destination):
     """
     if source not in nodes and source < 0xfff8:
         nodes.append(source)
-        logging.debug('node: %#x') % source
+        logging.debug('node: %#x' % source)
     if destination not in nodes and destination < 0xfff8:
         nodes.append(destination)
-        logging.debug('node: %#x') % destination
+        logging.debug('node: %#x' % destination)
     if source < 0xfff8 and destination < 0xfff8:
         link = (source, destination)
         if link not in links:
             links.append(link)
-            logging.info('link: %#x <-> %#x') % (source, destination)
+            logging.info('link: %#x <-> %#x' % (source, destination))
 
 
-def update_netjson():
+def update_net_json():
     nodes_desc = []
     links_desc = []
 
@@ -92,22 +93,8 @@ def update_netjson():
         )
 
 
-def usage(cmd):
-    logging.warning('*' * 50)
-    logging.warning('''A tool to visualize zigbee mesh network.\n
-    %s <pcap/pcapng file> <nwk key file>
-    ''') % cmd
-
-
-def main(argv):
-    try:
-        packets = rdpcap(argv[1])
-    except IOError:
-        logging.error('failed to open pcap/pcapng file')
-        usage(argv[0])
-        exit()
-
-    network_key = argv[2]
+def main(pcap):
+    packets = rdpcap(pcap.name)
     for packet in packets:
         try:
             update_from_route_record(packet[ZigbeeNWK].source,
@@ -119,11 +106,17 @@ def main(argv):
                     packet, error
                 )
             )
-    update_netjson()
+    update_net_json()
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        usage(sys.argv[0])
-        exit()
-    main(sys.argv)
+    parser = argparse.ArgumentParser(
+        description='Turn a PCAP to the corresponding network.json'
+    )
+    parser.add_argument('infile',
+                        nargs='?',
+                        type=argparse.FileType('r'),
+                        default=sys.stdin,
+                        help='Input PCAP file')
+    args = parser.parse_args()
+    main(args.infile)
