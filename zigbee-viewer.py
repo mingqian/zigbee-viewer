@@ -17,6 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import json
+import logging
 import sys
 
 from scapy.all import rdpcap
@@ -25,24 +26,11 @@ from scapy.layers.zigbee import (
     ZigbeeNWK
 )
 
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
+
 conf.dot15d4_protocol = "zigbee"
 nodes = []
 links = []
-
-
-def show_nodes():
-    for n in nodes:
-        print('node: %#x') % n
-
-
-def show_links():
-    for link in links:
-        print('link: %#x <-> %#x') % (link[0], link[1])
-
-
-def show_network():
-    show_nodes()
-    show_links()
 
 
 def update_from_route_record(source, destination):
@@ -67,12 +55,15 @@ def update_from_route_record(source, destination):
     """
     if source not in nodes and source < 0xfff8:
         nodes.append(source)
+        logging.debug('node: %#x') % source
     if destination not in nodes and destination < 0xfff8:
         nodes.append(destination)
+        logging.debug('node: %#x') % destination
     if source < 0xfff8 and destination < 0xfff8:
         link = (source, destination)
         if link not in links:
             links.append(link)
+            logging.info('link: %#x <-> %#x') % (source, destination)
 
 
 def update_netjson():
@@ -102,28 +93,31 @@ def update_netjson():
 
 
 def usage(cmd):
-    print('*' * 50)
-    print('''A tool to visualize zigbee mesh network.\n
+    logging.warning('*' * 50)
+    logging.warning('''A tool to visualize zigbee mesh network.\n
     %s <pcap/pcapng file> <nwk key file>
     ''') % cmd
 
 
 def main(argv):
     try:
-        pkts = rdpcap(argv[1])
+        packets = rdpcap(argv[1])
     except IOError:
-        print('ERROR: failed to open pcap/pcapng file')
+        logging.error('failed to open pcap/pcapng file')
         usage(argv[0])
         exit()
 
     network_key = argv[2]
-    for p in pkts:
+    for packet in packets:
         try:
-            update_from_route_record(p[ZigbeeNWK].source,
-                                     p[ZigbeeNWK].destination)
-        except IndexError:
-            continue
-    # show_network()
+            update_from_route_record(packet[ZigbeeNWK].source,
+                                     packet[ZigbeeNWK].destination)
+        except IndexError as error:
+            logging.debug(
+                "Could not parse Zigbee frame %s\n\tFollowing error wa raised %s" % (
+                    packet, error
+                )
+            )
     update_netjson()
 
 
