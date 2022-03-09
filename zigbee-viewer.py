@@ -98,13 +98,12 @@ def update_net_json():
 
 def main(pcap):
     """
-    Main function parsing the input pcap. the argument is the file object not
-    the file path.
+    Main function parsing the input pcap path.
     Use scapy to read this pcap.
 
        :parameter pcap: File object of the PCAP to parse, not the path.
     """
-    packets = rdpcap(pcap.name)
+    packets = rdpcap(pcap)
     for packet in packets:  # Iterate over the PCAP
         try:
             update_from_route_record(packet[ZigbeeNWK].source,
@@ -125,7 +124,7 @@ if __name__ == "__main__":
     )
     parser.add_argument('infile',
                         nargs='?',
-                        type=argparse.FileType('r'),
+                        type=str,
                         default=sys.stdin,
                         help='Input PCAP file')
     args = parser.parse_args()
