@@ -68,6 +68,9 @@ def update_from_route_record(source, destination):
 
 
 def update_net_json():
+    """
+    Create the network JSON using hte module variables.
+    """
     nodes_desc = []
     links_desc = []
 
@@ -94,8 +97,15 @@ def update_net_json():
 
 
 def main(pcap):
+    """
+    Main function parsing the input pcap. the argument is the file object not
+    the file path.
+    Use scapy to read this pcap.
+
+       :parameter pcap: File object of the PCAP to parse, not the path.
+    """
     packets = rdpcap(pcap.name)
-    for packet in packets:
+    for packet in packets:  # Iterate over the PCAP
         try:
             update_from_route_record(packet[ZigbeeNWK].source,
                                      packet[ZigbeeNWK].destination)
