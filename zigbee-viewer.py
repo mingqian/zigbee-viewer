@@ -16,64 +16,54 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys
-from scapy.all import rdpcap
-from scapy.layers.zigbee import ZigbeeNWK, ZigbeeSecurityHeader
-from Cryptodome.Cipher import AES
-from binascii import unhexlify
-from struct import pack, unpack
 import json
+import logging
+import sys
 
+from scapy.all import rdpcap
+from scapy.config import conf
+from scapy.layers.zigbee import (
+    ZigbeeNWK
+)
+
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
+
+conf.dot15d4_protocol = "zigbee"
 nodes = []
 links = []
 
 
-def show_nodes():
-    for n in nodes:
-        print('node: %#x') % n
-
-
-def show_links():
-    for link in links:
-        print('link: %#x <-> %#x') % (link[0], link[1])
-
-
-def show_network():
-    show_nodes()
-    show_links()
-
-
-def update_from_route_record(addr, cnt, data):
-    """TODO: Docstring for update_from_route_record.
-
-    :addr: route record source address
-    :cnt:  relay count
-    :data: relay lists in route record payload
-
+def update_from_route_record(source, destination):
     """
-    relays = []
+    Source and destination are nodes. Links are a tuple made of those two.
+    It exclude all types of broadcast communication are exclude. See the note
+    containing an extract of the 3.6.5 paragraph listing the different address.
 
-    if addr not in nodes:
-        nodes.append(addr)
+       :source: Source address of the Zigbee frame
+       :destination:  Destination address of the Zigbee frame
 
-    for i in range(cnt):
-        relay = unpack("<H", data[2 * i: 2 * i + 2])[0]
-        relays.append(relay)
+    .. note::
 
-        # update nodes in the network
-        if relay not in nodes:
-            nodes.append(relay)
+       3.6.5 Broadcast Communication
 
-        # update links in the network
-        if i == 0:
-            link = (addr, relay)
-        else:
-            link = (relays[-2], relay)
-
+          - 0xffff: All devices in PAN
+          - 0xfffe: Reserved
+          - 0xfffd: macRxOnWhenIdle = TRUE
+          - 0xfffc: All routers and coordinator
+          - 0xfffb: Low power routers only
+          - 0xfff8 - 0xfffa: Reserved
+    """
+    if source not in nodes and source < 0xfff8:
+        nodes.append(source)
+        logging.debug('node: %#x') % source
+    if destination not in nodes and destination < 0xfff8:
+        nodes.append(destination)
+        logging.debug('node: %#x') % destination
+    if source < 0xfff8 and destination < 0xfff8:
+        link = (source, destination)
         if link not in links:
             links.append(link)
-
-        # TODO: find the link to ZC
+            logging.info('link: %#x <-> %#x') % (source, destination)
 
 
 def update_netjson():
@@ -88,56 +78,47 @@ def update_netjson():
                            'target': hex(link[1]),
                            'cost': 1.0})
 
-    with open('netjson.json', 'w+') as f:
-        f.write(json.dumps({
-                            'type': 'NetworkGraph',
-                            'label': 'ZigBee',
-                            'protocol': 'OLSR',
-                            'version': '0.6.6.2',
-                            'metric': 'ETX',
-                            'nodes': nodes_desc,
-                            'links': links_desc
-                            })
-                )
+    with open('netjson.json', 'w+') as net_json_file:
+        net_json_file.write(
+            json.dumps({
+                'type': 'NetworkGraph',
+                'label': 'ZigBee',
+                'protocol': 'OLSR',
+                'version': '0.6.6.2',
+                'metric': 'ETX',
+                'nodes': nodes_desc,
+                'links': links_desc
+            })
+        )
 
 
 def usage(cmd):
-    print('*' * 50)
-    print('''A tool to visualize zigbee mesh network.\n
+    logging.warning('*' * 50)
+    logging.warning('''A tool to visualize zigbee mesh network.\n
     %s <pcap/pcapng file> <nwk key file>
     ''') % cmd
 
 
 def main(argv):
     try:
-        pkts = rdpcap(argv[1])
+        packets = rdpcap(argv[1])
     except IOError:
-        print('ERROR: failed to open pcap/pcapng file')
+        logging.error('failed to open pcap/pcapng file')
         usage(argv[0])
         exit()
 
-    try:
-        with open(argv[2]) as f:
-            nwkkey = f.readline()
-    except IOError:
-        print('ERROR: failed to open nwk key file')
-        usage(argv[0])
-        exit()
-
-    for p in pkts:
-        addr = p[ZigbeeNWK].source
-        ext_src = p[ZigbeeSecurityHeader].source
-        sec_frm_cnt = p[ZigbeeSecurityHeader].fc
-        sec_cntl = 0x2d
-        nonce = pack('<QIB', ext_src, sec_frm_cnt, sec_cntl)
-        key = unhexlify(nwkkey[:-1])  # ignore last LF
-        cipher = AES.new(key, AES.MODE_CCM, nonce)
-        decrypted_data = cipher.decrypt(p.data)
-        info = unpack('BB', decrypted_data[:2])
-        if info[0] == 5 and info[1] > 0:  # route record && relay count > 0
-            update_from_route_record(addr, info[1], decrypted_data[2:])
-
-    # show_network()
+    network_key = argv[2]
+    for packet in packets:
+        try:
+            update_from_route_record(packet[ZigbeeNWK].source,
+                                     packet[ZigbeeNWK].destination)
+        except IndexError as error:
+            logging.debug(
+                """Could not parse Zigbee frame %s
+                \tFollowing error wa raised %s""" % (
+                    packet, error
+                )
+            )
     update_netjson()
 
 
